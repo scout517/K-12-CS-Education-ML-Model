@@ -4,9 +4,9 @@ from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, roc_auc_score
 
-df = pd.read_csv('data/merged_data.csv')
+df = pd.read_csv('data/merged_data.csv', encoding='utf-8-sig')
 
 # print(df.head())
 
@@ -45,14 +45,6 @@ categorical_cols = [
 
 numerical_cols = [item for item in X.columns if item != 'State']
 
-def clean_numeric(s: pd.Series) -> pd.Series:
-    s = s.astype(str).str.strip()
-    s = s.replace(r'[^\d\.\-]', '', regex=True)  # keep only digits, dot, minus
-    return pd.to_numeric(s, errors='coerce')
-
-for col in numerical_cols:
-    X[col] = clean_numeric(X[col])
-
 preprocessor = ColumnTransformer(
     transformers=[
         ('num', StandardScaler(), numerical_cols),
@@ -62,15 +54,16 @@ preprocessor = ColumnTransformer(
 
 model = Pipeline(steps=[
     ('preprocessor', preprocessor),
-    ('classifier', LogisticRegression(max_iter=1000))
+    ('classifier', LogisticRegression(max_iter=1000, class_weight='balanced'))
 ])
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
 
 model.fit(X_train, y_train)
 
 y_pred = model.predict(X_test)
 
 print("Accuracy: ", accuracy_score(y_test, y_pred))
-print(classification_report(y_test, y_pred))
-print(confusion_matrix(y_test, y_pred))
+print(f"Classification Report:\n{classification_report(y_test, y_pred)}")
+print(f"Confusion matrix:\n{confusion_matrix(y_test, y_pred)}\n")
+print(f"ROC-AUC score:\n{roc_auc_score(y_test, y_pred)}")
