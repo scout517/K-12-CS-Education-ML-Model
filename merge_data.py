@@ -1,7 +1,5 @@
-import re
 import pandas as pd
 
-# ---------- Helpers ----------
 def read_csv_safe(path):
     """Try UTF-8 first, fall back to latin1 if needed."""
     try:
@@ -99,7 +97,7 @@ merged_1_2['Agency ID Last5'] = (
     merged_1_2['Agency ID'].astype(str).str.strip().str[-5:].str.zfill(5)
 )
 
-# ---------- 5) Second merge: + df3 on (last5, state) ----------
+# Second merge: + df3 on (last5, state)
 final_merged = pd.merge(
     merged_1_2,
     df3u,
@@ -109,17 +107,17 @@ final_merged = pd.merge(
     validate='m:1'
 )
 
-# ---------- 6) De-dup rows by (district, school, state) ----------
+# De-dup rows by (district, school, state)
 final_merged = final_merged.drop_duplicates(
     subset=['School District Name', 'School Name', 'State'],
     keep='first'
 )
 
-# ---------- 7) Map label; keep only modeling columns + label ----------
+# Map label; keep only modeling columns + label
 if LABEL_COL in final_merged.columns:
     final_merged[LABEL_COL] = final_merged[LABEL_COL].map({'Yes': 1, 'No': 0})
 
-# (Optional) drop columns you don't need downstream — safe list instead of big drop
+# Drop columns not needed
 keep_cols = (
     ['School District Name', 'School Name', 'State', LABEL_COL] +
     NUMERIC_COLS_TO_KEEP
@@ -127,25 +125,22 @@ keep_cols = (
 keep_cols = [c for c in keep_cols if c in final_merged.columns]
 final_merged = final_merged[keep_cols].copy()
 
-# ---------- 8) CLEAN NUMERICS HERE (prevents 'could not convert string to float: �') ----------
+# Clean numerics
 for col in NUMERIC_COLS_TO_KEEP:
     if col in final_merged.columns:
         final_merged[col] = clean_numeric_series(final_merged[col])
 
-# (Optional) show if anything turned into NaN; you can decide how to handle later
 na_counts = final_merged[NUMERIC_COLS_TO_KEEP].isna().sum()
 na_counts = na_counts[na_counts > 0]
 if not na_counts.empty:
     print("\n[Info] Remaining NaNs after numeric cleaning (you can impute later in your ML pipeline):")
     print(na_counts.sort_values(ascending=False))
 
-# DO NOT nuke all rows with any NaN — let your pipeline impute.
-# If you must drop rows missing the label only:
 if LABEL_COL in final_merged.columns:
     final_merged = final_merged.dropna(subset=[LABEL_COL])
 
 final_merged = final_merged.dropna()
 
-# ---------- 9) Save with safe encoding ----------
+# Save
 final_merged.to_csv('merged_data.csv', index=False, encoding='utf-8-sig')
 print("Wrote merged_data.csv with cleaned numerics and UTF-8 BOM.")
